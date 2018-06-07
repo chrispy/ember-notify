@@ -4,16 +4,30 @@
 
 `ember-notify` displays wee little notification messages down the bottom of your Ember.js app.
 
+## Fork Notice (chrispy)
+
+* Switched to yarn
+* Upgraded packages/code to Ember 2.18
+* Ran ember-modules-codemod
+* Cleaned and updated node_modules
+* Removed bower
+* Simplified/refactored code
+* Added custom onClick handlers
+* Added option to not show duplicate messages at the same time
+* Moved service/model into correct folder
+* Converted vendor/css to app/styles/scss
+* Removed themes
+* Removed Runner class
+* Removed non-block support
+* Removed alert type
+* Removed observer dependency (messages can't get closed programmatically now, which i dont need anyway)
+* Removed rounded corners support from component, use css instead
+* Removed initializer, import notify service manually where needed instead
+* Rewrote tests with simplified qunit
+  * TODO: unit test service
+  * TOOD: check if "ember-qunit: Ember.onerror validation: Ember.onerror is functioning properly" is actually the correct behaviour here (see https://git.io/vbine)
+
 ### Compatibility
-
-ember-notify is compatible with the following presentation frameworks:
-
-- Zurb Foundation 6 (default)
-- Zurb Foundation 5: `{{ember-notify messageStyle='foundation-5'}}`
-- Thoughtbot Refills: `{{ember-notify messageStyle='refills'}}`
-- Twitter Bootstrap: `{{ember-notify messageStyle='bootstrap'}}`
-- Semantic-UI: `{{ember-notify messageStyle='semantic-ui'}}`
-- UIKit: `{{ember-notify messageStyle='uikit'}}`
 
 The CSS animations are inspired by CSS from [alertify.js](http://fabien-d.github.io/alertify.js/). You can also customize the positioning and animations by overriding the default `ember-notify` CSS class. For usage, see the [animations example](#custom-animations).
 
@@ -21,7 +35,7 @@ The CSS animations are inspired by CSS from [alertify.js](http://fabien-d.github
 
 1. Add `{{ember-notify}}` to one of your templates, usually in `application.hbs`
 2. Inject the `notify` service
-3. Display messages using the `info`, `success`, `warning`, `alert` and `error` methods
+3. Display messages using the `info`, `success`, `warning` and `error` methods
 
 ### Examples
 
@@ -30,6 +44,7 @@ import {
   Component,
   inject
 } from 'ember';
+
 export default Component.extend({
   notify: inject.service('notify'),
   actions: {
@@ -40,10 +55,33 @@ export default Component.extend({
 });
 ```
 
+```hbs
+  {{#ember-notify as |message close click|}}
+    {{#if message.icon}}
+      {{!-- Display an icon however you want. I'm using SVG --}}
+    {{/if}}
+    <div class='notify-content' onClick={{action click}}>
+      {{message.text}}{{{message.html}}}
+    </div>
+    <button onClick={{action close}}>Close</button>
+  {{/ember-notify}}
+```
+
+Three arguments are passed to the block: `message` object, `close` and `click` action. Make sure
+you are using *Closure Actions* syntax passing the action (e. g. `<a {{action close}}` or
+`{{your-component close=(action close)`.
+
+
 By default the notifications close after 2.5 seconds, although you can control this in your template:
 
 ```handlebars
 {{ember-notify closeAfter=4000}}
+```
+
+By default duplicate notifications are not shown at the same time, if you want to show them:
+
+```handlebars
+{{ember-notify hideDuplicates=false}}
 ```
 
 Or you can control when each message is closed:
@@ -55,24 +93,10 @@ var message = notify.alert('You can control how long it\'s displayed', {
 });
 ```
 
-...and you can hide messages programmatically:
-
-```js
-message.set('visible', false);
-```
-
 You can specify raw HTML:
 
 ```js
 notify.info({html: '<div class="my-div">Hooray!</div>'});
-```
-
-Rounded corners, if that's your thing:
-
-```js
-notify.alert('This one\'s got rounded corners.', {
-  radius: true
-});
 ```
 
 Include custom `classNames` on your message:
@@ -83,14 +107,21 @@ notify.alert('Custom CSS class', {
 })
 ```
 
-### Initializer
-
-If you prefer not to call `Ember.inject.service('notify')` you can use an initializer:
+Do something special when clicking the notification container:
 
 ```js
-// app/initializers/ember-notify.js
-export {default} from 'ember-notify/initializer';
+notify.alert('Custom CSS class', {
+  onClick: this.doClick.bind(this)
+})
+
+doClick() {
+  // do something
+}
 ```
+
+Note the .bind(this), which is needed if you need the callers scope when calling.
+If no onClick handler is passed, the default close action is called.
+
 
 ### Multiple Containers
 
@@ -106,25 +137,18 @@ The others you will need to provide a `source` property, so secondary containers
 import Notify from 'ember-notify';
 
 export default Ember.Component.extend({
-  someProperty: Notify.property(), // or this.set('someProperty', Notify.create())
+  secondNotify: null,
+  init() {
+    this._super(...arguments);
+    this.set('secondNotify', Notify.create);
+  },
   actions: {
     clicked: function() {
-      this.get('someProperty').success('Hello from the controller');
+      this.get('secondNotify').success('Hello from the controller');
     }
   }
 });
 ```
-### Custom message template
-You can pass a block with template you wanna be used for each message (instead of using the default one). It may look like this:
-```hbs
-  {{#ember-notify as |message close|}}
-    <a {{action close}} class='close'>close from block</a>
-    <span class='message-from-block'>{{message.text}}</span>
-  {{/ember-notify}}
-```
-Two arguments are passed to the block: `message` object, and `close` action. Make sure
-you are using *Closure Actions* syntax passing the action (e. g. `<a {{action close}}` or
-`{{your-component close=(action close)`.
 
 ### Custom Animations
 
@@ -140,6 +164,7 @@ with the class you pass in.
 ```
 Then you need to add custom styling for each of the elements within the `ember-notify` structure.
 The following snippet summarizes rules needed for a custom look. For a complete example that you can drop into your project, see [examples/custom-position-animations.css](examples/custom-position-animations.css)
+
 ```css
 /* main container */
 .custom-notify {

@@ -1,111 +1,58 @@
-import Ember from 'ember';
+import Component from '@ember/component';
 import layout from '../../templates/components/ember-notify/message';
-import Notify from 'ember-notify';
+import { later } from '@ember/runloop';
+import { computed } from '@ember/object';
+import { alias } from '@ember/object/computed';
 
-export default Ember.Component.extend({
-  layout: layout,
-  message: {},
-  closeAfter: null,
+export default Component.extend({
+  layout,
+  // auto-close after this many milliseconds (starts the close css transition)
+  defaultCloseAfter: null,
+  // remove message from parent component list after this many milliseconds.
+  // needs to match the css transition timer
+  waitForCloseAnimation: 250,
+  message: null,
+  visible: alias('message.visible'),
+  icon: alias('message.icon'),
+  type: alias('message.type'),
+  closed: alias('message.closed'),
+  // passed in closure action to remove message from parent component
+  removeMessage: null,
 
   classNameBindings: [
-    'message.visible:ember-notify-show:ember-notify-hide', 'radius::', 'themeClassNames',
-    'message.classNames'
+    'visible:ember-notify-show:ember-notify-hide',
+    'message.type',
   ],
-  attributeBindings: ['data-alert'],
-  'data-alert': '',
 
-  run: null,
+  closeAfterOrDefault: computed('message.closeAfter', 'defaultCloseAfter', function(){
+    const closeAfter = this.get('message.closeAfter');
+    if (closeAfter === undefined) return this.get('defaultCloseAfter');
+    return closeAfter;
+  }),
 
-  init: function() {
-    this._super();
-    // indicate that the message is now being displayed
-    if (this.get('message.visible') === undefined) {
-      // should really be in didInsertElement but Glimmer doesn't allow this
-      this.set('message.visible', true);
-    }
-    this.run = Runner.create({
-      // disable all the scheduling in tests
-      disabled: Ember.testing && !Notify.testing
-    });
-  },
   didInsertElement: function() {
-    var element = this.get('message.element');
-    if (element) {
-      this.$('.message').append(element);
+    if (this.get('closeAfterOrDefault')) {
+      later(() => this.send('close'), this.get('closeAfterOrDefault'));
     }
-    var closeAfter = this.get('message.closeAfter');
-    if (closeAfter === undefined) closeAfter = this.get('closeAfter');
-    if (closeAfter) {
-      this.run.later(() => this.send('closeIntent'), closeAfter);
-    }
-  },
-  themeClassNames: Ember.computed('theme', 'message.type', function() {
-    var theme = this.get('theme');
-    return theme ? theme.classNamesFor(this.get('message')) : '';
-  }),
-  visibleObserver: Ember.observer('message.visible', function() {
-    if (!this.get('message.visible')) {
-      this.send('closeIntent');
-    }
-  }),
-  isHovering: function() {
-    return this.$().is(':hover');
   },
 
   actions: {
-    // alias to close action so we can poll whether hover state is active
-    closeIntent: function() {
-      if (this.get('isDestroyed')) return;
-      if (this.isHovering()) {
-        return this.run.later(() => this.send('closeIntent'), 100);
-      }
-      // when :hover no longer applies, close as normal
-      this.send('close');
-    },
     close: function() {
-      if (this.get('message.closed')) return;
-      this.set('message.closed', true);
-      this.set('message.visible', false);
-      var removeAfter = this.get('message.removeAfter') || this.constructor.removeAfter;
-      if (removeAfter) {
-        this.run.later(this, remove, removeAfter);
-      }
-      else {
-        remove();
-      }
-      function remove() {
-        var parentView = this.get('parentView');
-        if (this.get('isDestroyed') || !parentView || !parentView.get('messages')) return;
-        parentView.get('messages').removeObject(this.get('message'));
-        this.set('message.visible', null);
-      }
-    }
-  }
-}).reopenClass({
-  removeAfter: 250 // allow time for the close animation to finish
-});
+      if (this.get('closed')) return;
+      if (!this.get('visible')) return;
+      this.set('closed', true);
+      this.set('visible', false);
+      later(this, this.removeMessage, this.get('message'), this.get('waitForCloseAnimation'));
+    },
 
-// getting the run loop to do what we want is difficult, hence the Runner...
-var Runner = Ember.Object.extend({
-  init: function() {
-    if (!this.disabled) {
-      // this is horrible but this avoids delays from the run loop
-      this.next = function(ctx, fn) {
-        var args = arguments;
-        setTimeout(function() {
-          Ember.run(function() {
-            fn.apply(ctx, args);
-          });
-        }, 0);
-      };
-      this.later = function() {
-        Ember.run.later.apply(Ember.run, arguments);
-      };
-    }
-    else {
-      this.next = this.later = function zalkoBegone(ctx, fn) {
-        Ember.run.next(ctx, fn);
-      };
-    }
+    click: function(event) {
+      if(!this.get('message.onClick')) return this.send('close');
+
+      this.get('message.onClick')(event, this.element);
+      // let some time for visual clue
+      later(() => {
+        this.send('close');
+      }, 100);
+    },
   }
 });

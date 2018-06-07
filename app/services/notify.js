@@ -1,2 +1,1 @@
-import Notify from 'ember-notify';
-export default Notify;
+export { default } from 'ember-notify/services/notify';

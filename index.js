@@ -1,16 +1,23 @@
-/* jshint node: true */
 'use strict';
-var assign = require('object-assign');
+
+const assign = require('object-assign');
 
 module.exports = {
   name: 'ember-notify',
+
+  isDevelopingAddon: function() {
+    return true;
+  },
+
   included: function(app) {
     this._super.included.apply(this, arguments);
-    var options = assign({
+
+    const options = assign({
       importCss: true
     }, app.options.emberNotify);
+
     if (options.importCss) {
-      app.import('vendor/ember-notify.css');
+      app.import('styles/app.css');
     }
   }
 };

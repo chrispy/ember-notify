@@ -1,5 +1,9 @@
 # Changelog
 
+## v5.2.2
+
+- Forked it and changed a lot, see README.md for more.
+
 ## v5.0
 
 - The default theme is now compatible with Foundation 6. If you want to use Foundation 5 then use `{{ember-notify messageStyle='foundation-5'}}`

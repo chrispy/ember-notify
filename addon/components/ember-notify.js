@@ -1,138 +1,52 @@
-import Ember from 'ember';
+import Component from '@ember/component';
 import layout from '../templates/components/ember-notify';
-import Message from 'ember-notify/message';
+import { A } from '@ember/array';
+import { oneWay } from '@ember/object/computed';
+import { inject as service } from '@ember/service';
 
-export default Ember.Component.extend({
+export default Component.extend({
   layout: layout,
-
-  notify: Ember.inject.service(),
-  source: Ember.computed.oneWay('notify'),
+  notify: service(),
+  source: oneWay('notify'),
   messages: null,
-  closeAfter: 2500,
-
-  classPrefix: Ember.computed(function() {
-    return this.get('defaultClass') || 'ember-notify-default';
-  }),
-  classNames: ['ember-notify-cn'],
-  classNameBindings: ['classPrefix'],
-  messageStyle: 'foundation',
+  defaultCloseAfter: 2500,
+  // dont show duplicate messages, only valid as long as the last message is shown.
+  // when last message is closed, the same message may appear again
+  hideDuplicates: true,
+  lastMessage: null,
+  classNames: [
+    'ember-notify-cn'
+  ],
+  classPrefix: 'ember-notify-default',
+  classNamesBindings: null,
 
   init: function() {
-    this._super();
-    this.set('messages', Ember.A());
+    this._super(...arguments);
+    this.setProperties({
+      messages: A(),
+      classNamesBindings: [
+        'classPrefix'
+      ]
+    });
     this.get('source').setTarget(this);
-
-    var style = this.get('messageStyle'), theme;
-    switch (style) {
-      case 'foundation':
-        theme = FoundationTheme.create();
-        break;
-      case 'uikit':
-          theme = UIkitTheme.create();
-          break;  
-      case 'foundation-5':
-        theme = Foundation5Theme.create();
-        break;
-      case 'bootstrap':
-        theme = BootstrapTheme.create();
-        break;
-      case 'refills':
-        theme = RefillsTheme.create();
-        break;
-      case 'semantic-ui':
-        theme = SemanticUiTheme.create();
-        break;
-      default:
-        throw new Error(
-          `Unknown messageStyle ${style}: options are 'foundation', 'refills', 'bootstrap', and 'semantic-ui'`
-        );
-    }
-    this.set('theme', theme);
   },
+
   willDestroyElement: function() {
     this.get('source').setTarget(null);
   },
+
   show: function(message) {
     if (this.get('isDestroyed')) return;
-    if (!(message instanceof Message)) {
-      message = Message.create(message);
+    if(this.get('hideDuplicates')){
+      if(message.isSameMessage(this.get('lastMessage'))) return;
+      this.set('lastMessage', message);
     }
     this.get('messages').pushObject(message);
     return message;
-  }
-});
+  },
 
-export var Theme = Ember.Object.extend({
-  classNamesFor(message) {
-    return message.get('type');
-  }
-});
-
-export var FoundationTheme = Theme.extend({
-  classNamesFor(message) {
-    var type = message.get('type');
-    var classNames = ['callout', type];
-    if (type === 'error') classNames.push('alert');
-    return classNames.join(' ');
-  }
-});
-
-export var Foundation5Theme = Theme.extend({
-  classNamesFor(message) {
-    var type = message.get('type');
-    var classNames = ['alert-box', type];
-    if (type === 'error') classNames.push('alert');
-    return classNames.join(' ');
-  }
-});
-
-export var BootstrapTheme = Theme.extend({
-  classNamesFor(message) {
-    var type = message.get('type');
-    if (type === 'alert' || type === 'error') type = 'danger';
-    var classNames = ['alert', `alert-${type}`];
-    return classNames.join(' ');
-  }
-});
-
-export var RefillsTheme = Theme.extend({
-  classNamesFor(message) {
-    var type = message.get('type');
-    var typeMapping = {
-      success: 'success',
-      alert: 'error',
-      error: 'error',
-      info: 'notice',
-      warning: 'alert'
-    };
-    return 'flash-' + typeMapping[type];
-  }
-});
-
-export var SemanticUiTheme = Theme.extend({
-  classNamesFor(message){
-    var type = message.get('type');
-    var typeMapping = {
-      success: 'success',
-      alert: 'error',
-      error: 'error',
-      info: 'info',
-      warning: 'warning'
-    };
-    return 'ui message ' + typeMapping[type];
-  }
-});
-
-export var UIkitTheme = Theme.extend({
-  classNamesFor(message){
-    var type = message.get('type');
-    var typeMapping = {
-      success: 'success',
-      alert: 'warning',
-      error: 'danger',
-      info: 'info',
-      warning: 'warning'
-    };
-    return 'uk-notify-message uk-notify-message-' + typeMapping[type];
-  }
+  removeMessage(message) {
+    if(this.get('hideDuplicates')) this.set('lastMessage', null);
+    this.get('messages').removeObject(message);
+  },
 });
